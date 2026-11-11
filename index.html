@@ -2,7 +2,17 @@
 <html lang="fr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Simulateur de cintreuse 400 – 3D (hors ligne)</title>
+<title>Simulateur de cintreuse 400 – 3D</title>
+<meta name="description" content="Simulateur de cintreuse à levier en 3D pour les étudiants en électromécanique.">
+<meta name="theme-color" content="#1f2327">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icone.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icone-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cintreuse 3D">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -1219,5 +1229,9 @@ $('len').focus({preventScroll:true});
 window.__cint={get state(){return {present,L,p,psi,lever,bends,cur,marks,measures};},
   setLever:v=>{lever=v; if(present){const lim=bendLimit(); if(lim.max>0.5){ if(!cur) cur={s0:p,a:0,th:psi}; cur.a=Math.max(cur.a,Math.min(v,lim.max)); }} render(); sync();},
   setP:v=>{commit(); p=v; render();}};
+</script>
+<script>
+// App installable (PWA) : le service worker garde tout en cache pour l'utiliser sans Internet
+if('serviceWorker' in navigator && location.protocol==='https:') addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body></html>

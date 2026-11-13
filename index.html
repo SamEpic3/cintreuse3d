@@ -351,7 +351,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
 const scene=new THREE.Scene();
 const pmrem=new THREE.PMREMGenerator(renderer);
-scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+scene.environment=pmrem.fromScene(new RoomEnvironment(renderer),0.04).texture;   // le renderer donne la bonne intensité aux reflets (comme dans Conduits 3D)
 scene.add(new THREE.HemisphereLight(0xffffff,0x8a9096,0.55));
 const sun=new THREE.DirectionalLight(0xffffff,1.3); sun.position.set(4,9,10); scene.add(sun);
 const camera=new THREE.PerspectiveCamera(32,1,0.05,600);
@@ -369,7 +369,7 @@ const MAT={
   grip:new THREE.MeshStandardMaterial({color:0x1b1c1f,metalness:0,roughness:.85}),
   insert:new THREE.MeshStandardMaterial({color:0x26282c,metalness:.2,roughness:.5}),
   bolt:new THREE.MeshStandardMaterial({color:0xdadde1,metalness:.85,roughness:.22}),
-  copper:new THREE.MeshStandardMaterial({color:0xc8814a,metalness:.88,roughness:.3,side:THREE.DoubleSide}),
+  copper:new THREE.MeshStandardMaterial({color:0xc8805a,metalness:1,roughness:.33,side:THREE.DoubleSide}),   // même cuivre que Conduits 3D
   tapeA:new THREE.MeshStandardMaterial({color:0x2b5fae,roughness:.6,side:THREE.DoubleSide}),
   tapeB:new THREE.MeshStandardMaterial({color:0xc62828,roughness:.6,side:THREE.DoubleSide}),
   hole:new THREE.MeshStandardMaterial({color:0x3b2212,roughness:.9,side:THREE.DoubleSide}),
@@ -502,10 +502,9 @@ function ghost(on){
 const tubeG=new THREE.Group(); tubeG.userData.kind='tube'; scene.add(tubeG);
 const mCopper=new THREE.Mesh(new THREE.BufferGeometry(),MAT.copper), mA=new THREE.Mesh(new THREE.BufferGeometry(),MAT.tapeA), mB=new THREE.Mesh(new THREE.BufferGeometry(),MAT.tapeB);
 const mHole=new THREE.Mesh(new THREE.BufferGeometry(),MAT.hole);
-const ticks=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x5a2f10,transparent:true,opacity:.5}));
 const stripe=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x111111}));
 const marksG=new THREE.Group();
-tubeG.add(mCopper,mA,mB,mHole,ticks,stripe,marksG);
+tubeG.add(mCopper,mA,mB,mHole,stripe,marksG);
 const torusG=new THREE.TorusGeometry(RT+0.006,0.016,8,40), torusP=new THREE.TorusGeometry(RT+0.02,0.022,8,40);
 
 // ---------- État ----------
@@ -551,13 +550,13 @@ function sampleRange(list,s0,s1){
   return [...new Set(ss)].sort((u,v)=>u-v);
 }
 function tubeGeom(list,W,s0,s1,r,caps){
-  const ss=sampleRange(list,s0,s1), SEG=28, pos=[], nor=[], idx=[];
+  const ss=sampleRange(list,s0,s1), SEG=40, pos=[], nor=[], idx=[];
   ss.forEach((s,i)=>{
     const q=W(poseAt(list,s));
     for(let j=0;j<=SEG;j++){const a=j/SEG*2*Math.PI, c=Math.cos(a), sn=Math.sin(a);
       const n=q.N.clone().multiplyScalar(c).addScaledVector(q.B,sn);
       pos.push(q.P.x+n.x*r,q.P.y+n.y*r,q.P.z+n.z*r); nor.push(n.x,n.y,n.z);}
-    if(i){const b0=(i-1)*(SEG+1), b1=i*(SEG+1); for(let j=0;j<SEG;j++) idx.push(b0+j,b1+j,b0+j+1,b0+j+1,b1+j,b1+j+1);}
+    if(i){const b0=(i-1)*(SEG+1), b1=i*(SEG+1); for(let j=0;j<SEG;j++) idx.push(b0+j,b0+j+1,b1+j,b0+j+1,b1+j+1,b1+j);}   // faces tournées vers l'extérieur
   });
   for(const s of caps||[]){        // bout : couronne (épaisseur de paroi)
     const q=W(poseAt(list,s)), sg=s<=0?-1:1, base=pos.length/3, ri=r-0.04;
@@ -607,10 +606,6 @@ function renderTube(){
   const list=allBends(), W=worldFn(list), tape=0.35;
   for(const [m,a,b,caps] of [[mCopper,tape,L-tape],[mA,0,tape,[0]],[mB,L-tape,L,[L]]]){m.geometry.dispose(); m.geometry=tubeGeom(list,W,a,b,caps?RT+0.003:RT,caps);}
   mHole.geometry.dispose(); mHole.geometry=holeGeom(list,W);
-  const tk=[];
-  for(let s=1;s<L-0.01;s+=1){const q=W(poseAt(list,s)); let prev=null;
-    for(let j=0;j<=24;j++){const a=j/24*2*Math.PI, v=q.P.clone().addScaledVector(q.N,Math.cos(a)*(RT+0.004)).addScaledVector(q.B,Math.sin(a)*(RT+0.004)); if(prev) tk.push(prev.x,prev.y,prev.z,v.x,v.y,v.z); prev=v;}}
-  ticks.geometry.dispose(); ticks.geometry=new THREE.BufferGeometry(); ticks.geometry.setAttribute('position',new THREE.Float32BufferAttribute(tk,3));
   const st=[]; for(const s of sampleRange(list,tape,L-tape)){const q=W(poseAt(list,s)); const v=q.P.clone().addScaledVector(q.B,-(RT+0.004)); st.push(v.x,v.y,v.z);}
   stripe.geometry.dispose(); stripe.geometry=new THREE.BufferGeometry(); stripe.geometry.setAttribute('position',new THREE.Float32BufferAttribute(st,3));
   marksG.clear();
@@ -618,7 +613,7 @@ function renderTube(){
   for(const m of marks) put(m.s,torusG,MAT.mark);
   if(preview!=null) put(preview,torusP,MAT.prev);
   for(const m of [MAT.copper,MAT.tapeA,MAT.tapeB,MAT.hole]){m.transparent=opac<1; m.opacity=opac;}
-  ticks.material.opacity=.5*opac; stripe.material.transparent=opac<1; stripe.material.opacity=opac;
+  stripe.material.transparent=opac<1; stripe.material.opacity=opac;
 }
 function render(){
   lever3.rotation.z=-lever*DEG;

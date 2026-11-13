@@ -305,6 +305,11 @@ ol.bends small{display:block;font-family:var(--body);font-size:13px;color:var(--
           <p class="empty" id="measEmpty">Choisis l'outil Mesure, puis clique deux points.</p>
           <button class="wide" id="btnClearMeas">Effacer les mesures</button>
         </section>
+        <section>
+          <h2>Exporter</h2>
+          <p class="empty">Enregistre le tube cintré dans un fichier, pour le poser dans Conduits&nbsp;3D (Importer un tube cintré).</p>
+          <button class="wide" id="btnExport">Exporter le tube (.json)</button>
+        </section>
       </div>
     </div>
   </aside>
@@ -655,6 +660,7 @@ function sync(){
   $('btnMark').disabled=busy||!present;
   $('btnClearMarks').disabled=busy||!present||!marks.length;
   $('btnClearMeas').disabled=!measures.length;
+  $('btnExport').disabled=!present;
   $('btnRestart').disabled=busy||!present;
   $('btnUndo').disabled=busy||!history.length;
 }
@@ -1090,6 +1096,16 @@ function setTool(t){
 document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 function setMode(m){ mmode=m; if(mPreview){mPreview.mode=m; renderAnnot(); req();} document.querySelectorAll('.mode').forEach(b=>{const on=b.dataset.mode===m; b.classList.toggle('on',on); b.setAttribute('aria-checked',on);}); }
 document.querySelectorAll('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+// Exporte le tube cintré (longueur et coudes) pour Conduits 3D.
+$('btnExport').onclick=()=>{
+  if(!present){ note('Insère d\'abord un tube.',true); return; }
+  const data={format:'tube-cintre',version:1,source:'cintreuse3d',tube:'3/8',rayon:R,longueur:L,
+    coudes:allBends().map(b=>({s0:+b.s0.toFixed(4),a:+b.a.toFixed(3),th:+(((b.th%360)+360)%360).toFixed(3)}))};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  const a=document.createElement('a'); a.href=url; a.download='tube-cintre.json'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  note(`Tube exporté : ${data.coudes.length} coude${data.coudes.length>1?'s':''}, longueur ${fmtIn(L)}.`);
+};
 $('btnClearMeas').onclick=()=>{ pushHist('l\'effacement des mesures'); measures=[]; render(); sync(); note('Toutes les mesures sont effacées.'); };
 function parseIn(str){
   str=String(str).trim().replace(',', '.').replace(/(po|"|″)$/,'').trim();

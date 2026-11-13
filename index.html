@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Cintreuse 3D">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -152,9 +152,18 @@ ol.bends small{display:block;font-family:var(--body);font-size:13px;color:var(--
   .gizmo{bottom:130px}
 }
 @media (prefers-reduced-motion: reduce){button,.note{transition:none}}
+/* iOS 27 floute le haut des PWA installées : une bande opaque de 11 px tout en haut (avec la barre d'état « default »)
+   l'en empêche. Seulement en mode app installée ; le contenu est décalé d'autant. */
+#bandeIos{display:none}
+@media (display-mode: standalone){
+  #bandeIos{display:block;position:fixed;top:0;left:0;right:0;height:11px;background:var(--bg);z-index:1000;pointer-events:none}
+  body{padding-top:27px}
+}
+@media (display-mode: standalone) and (max-width:700px){body{padding-top:19px}}
 </style>
 </head>
 <body>
+<div id="bandeIos" aria-hidden="true"></div>
 <div class="stage t-hand" id="stage">
   <canvas id="cv" aria-label="Cintreuse à levier série 400 en 3D"></canvas>
   <div id="labels"></div>

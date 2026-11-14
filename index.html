@@ -15,6 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<script>if(/[?&]integre\b/.test(location.search)) document.documentElement.classList.add('integre');</script>
 <style>
 :root{
   --bg:#eef0f2; --panel:#ffffff; --fg:#1d2126; --muted:#5f6872; --line:#d5dade;
@@ -160,6 +161,16 @@ ol.bends small{display:block;font-family:var(--body);font-size:13px;color:var(--
   body{padding-top:27px}
 }
 @media (display-mode: standalone) and (max-width:700px){body{padding-top:19px}}
+/* Intégrée dans Conduits 3D (mode Cintrage) : la barre des modes de Conduits 3D est en haut à gauche. */
+#btnPoser{display:none}
+html.integre #btnPoser{display:flex}
+html.integre body{padding:0!important}
+html.integre .stage{border-radius:0;height:100vh;height:100dvh;min-height:0}
+html.integre #bandeIos,html.integre #btnFull{display:none!important}
+html.integre .toolbar.tools{top:62px}
+html.integre .toolbar.modes{top:112px}
+html.integre .popover{top:110px}
+@media (max-width:700px){html.integre .panel{top:112px;max-height:calc(100% - 184px)}}
 </style>
 </head>
 <body>
@@ -290,6 +301,7 @@ ol.bends small{display:block;font-family:var(--body);font-size:13px;color:var(--
         </section>
         <section id="secTube">
           <h2>Tube</h2>
+          <button class="primary wide" id="btnPoser" title="Pose ce tube dans le montage de Conduits 3D">Poser dans le montage</button>
           <div class="row">
             <button id="btnRestart" title="Remet un tube droit de la même longueur">Recommencer</button>
             <button id="btnRemove">Retirer le tube</button>
@@ -664,7 +676,7 @@ function sync(){
   $('btnMark').disabled=busy||!present;
   $('btnClearMarks').disabled=busy||!present||!marks.length;
   $('btnClearMeas').disabled=!measures.length;
-  $('btnExport').disabled=!present;
+  $('btnExport').disabled=!present; $('btnPoser').disabled=!present;
   $('btnRestart').disabled=busy||!present;
   $('btnUndo').disabled=busy||!history.length;
 }
@@ -1101,10 +1113,32 @@ document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>setTool(b.dataset.to
 function setMode(m){ mmode=m; if(mPreview){mPreview.mode=m; renderAnnot(); req();} document.querySelectorAll('.mode').forEach(b=>{const on=b.dataset.mode===m; b.classList.toggle('on',on); b.setAttribute('aria-checked',on);}); }
 document.querySelectorAll('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 // Exporte le tube cintré (longueur et coudes) pour Conduits 3D.
+const INTEGRE=document.documentElement.classList.contains('integre');
+const donneesTube=()=>({format:'tube-cintre',version:1,source:'cintreuse3d',tube:'3/8',rayon:R,longueur:L,
+  coudes:allBends().map(b=>({s0:+b.s0.toFixed(4),a:+b.a.toFixed(3),th:+(((b.th%360)+360)%360).toFixed(3)}))});
+// Intégrée dans Conduits 3D : le tube passe directement au montage (sans fichier).
+$('btnPoser').onclick=()=>{
+  if(!present){ note('Insère d\'abord un tube.',true); return; }
+  if(busy){ note('Attends la fin du mouvement en cours.',true); return; }
+  commit();
+  parent.postMessage({type:'conduits3d:tube',tube:donneesTube()},'*');
+};
+addEventListener('message',e=>{
+  const m=e.data; if(!m||e.source!==parent) return;
+  if(m.type==='conduits3d:charger'){
+    // Reprend un tube déjà posé dans le montage pour modifier son cintrage.
+    const t=m.tube; pushHist('le chargement du tube');
+    restore({present:true,L:t.longueur,p:Math.min(3,Math.round(t.longueur/2/SNAP)*SNAP),psi:0,lever:0,markSeq:0,
+      bends:t.coudes.map(b=>({s0:b.s0,a:b.a,th:b.th})),cur:null,marks:[],measures:[],mref:{type:'A',id:null,dir:1}});
+    render(); sync(); fitView(true);
+    note(`Tube du montage chargé : ${t.coudes.length} coude${t.coudes.length>1?'s':''}, ${fmtIn(t.longueur)}. Modifie-le, puis « Poser dans le montage ».`);
+  }
+  if(m.type==='conduits3d:longueur' && !present){ $('len').value=m.longueur; note(m.message||'Choisis la longueur du tube, puis insère-le.'); }
+});
 $('btnExport').onclick=()=>{
   if(!present){ note('Insère d\'abord un tube.',true); return; }
-  const data={format:'tube-cintre',version:1,source:'cintreuse3d',tube:'3/8',rayon:R,longueur:L,
-    coudes:allBends().map(b=>({s0:+b.s0.toFixed(4),a:+b.a.toFixed(3),th:+(((b.th%360)+360)%360).toFixed(3)}))};
+  const data=donneesTube();
+  if(INTEGRE){ $('btnPoser').click(); return; }
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
   const a=document.createElement('a'); a.href=url; a.download='tube-cintre.json'; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -1245,13 +1279,14 @@ themeColors(); resize();
 onCam(); setTool('hand'); setRef('A'); fillRefMarks(); render(); sync(); loop();
 $('loading').hidden=true;
 note('Choisis la longueur du tube dans le panneau, puis insère-le.');
-$('len').focus({preventScroll:true});
+if(INTEGRE){ $('btnExport').textContent='Poser dans le montage'; parent.postMessage({type:'conduits3d:pret'},'*'); }
+if(!INTEGRE && matchMedia('(pointer: fine)').matches) $('len').focus({preventScroll:true});
 window.__cint={get state(){return {present,L,p,psi,lever,bends,cur,marks,measures};},
   setLever:v=>{lever=v; if(present){const lim=bendLimit(); if(lim.max>0.5){ if(!cur) cur={s0:p,a:0,th:psi}; cur.a=Math.max(cur.a,Math.min(v,lim.max)); }} render(); sync();},
   setP:v=>{commit(); p=v; render();}};
 </script>
 <script>
 // App installable (PWA) : le service worker garde tout en cache pour l'utiliser sans Internet
-if('serviceWorker' in navigator && location.protocol==='https:') addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker' in navigator && location.protocol==='https:' && !/[?&]integre\b/.test(location.search)) addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body></html>
